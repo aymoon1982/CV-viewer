@@ -1,65 +1,139 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
+import { Plus, Briefcase, Users, Star, Clock } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
+import type { JobProfile } from '@/types'
+import { JobProfileCard } from '@/components/jobs/JobProfileCard'
+import { JobCardSkeleton } from '@/components/ui/Skeleton'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorState } from '@/components/ui/ErrorState'
+
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07 } },
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+}
+
+export default function DashboardPage() {
+  const [jobs, setJobs] = useState<JobProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchJobs = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await apiClient.jobs.list()
+      setJobs(data)
+    } catch {
+      setError('Failed to load job profiles.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchJobs() }, [])
+
+  const totalCandidates = jobs.reduce((sum, j) => sum + j.stats.uploaded, 0)
+  const totalShortlisted = jobs.reduce((sum, j) => sum + j.stats.shortlisted, 0)
+  const activeJobs = jobs.filter((j) => j.status === 'active').length
+
+  const stats = [
+    { label: 'Active Jobs', value: activeJobs, icon: Briefcase, color: '#6366F1' },
+    { label: 'Total Candidates', value: totalCandidates, icon: Users, color: '#22C55E' },
+    { label: 'Shortlisted', value: totalShortlisted, icon: Star, color: '#F59E0B' },
+    { label: 'Avg Time to Shortlist', value: '3.2d', icon: Clock, color: '#94A3B8' },
+  ]
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold mb-1"
+            style={{ color: '#F1F5F9', fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>
+            Recruitment Dashboard
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-sm" style={{ color: '#64748B', fontFamily: 'DM Sans, sans-serif' }}>
+            Monitor your hiring pipeline at a glance
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <Link href="/jobs/new"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:opacity-90"
+          style={{ background: '#6366F1', color: 'white', fontFamily: 'DM Sans, sans-serif' }}>
+          <Plus size={16} />
+          New Job Profile
+        </Link>
+      </div>
+
+      {/* Stats row */}
+      <motion.div
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible">
+        {stats.map(({ label, value, icon: Icon, color }) => (
+          <motion.div key={label} variants={cardVariants}
+            className="rounded-xl p-5 noise-texture"
+            style={{ background: '#111118', border: '1px solid #1E1E2E' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center"
+                style={{ background: `${color}20` }}>
+                <Icon size={18} style={{ color }} />
+              </div>
+            </div>
+            <p className="text-2xl font-bold mb-0.5"
+              style={{ color: '#F1F5F9', fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>
+              {typeof value === 'number' ? value.toLocaleString() : value}
+            </p>
+            <p className="text-xs" style={{ color: '#64748B', fontFamily: 'DM Sans, sans-serif' }}>
+              {label}
+            </p>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '11px', fontWeight: 600 }}>
+          Job Profiles ({jobs.length})
+        </h2>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => <JobCardSkeleton key={i} />)}
         </div>
-      </main>
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchJobs} />
+      ) : jobs.length === 0 ? (
+        <EmptyState
+          title="No job profiles yet"
+          description="Create your first job profile to start screening candidates with AI-powered analysis."
+          ctaLabel="Create your first job profile"
+          ctaHref="/jobs/new"
+        />
+      ) : (
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible">
+          {jobs.map((job) => (
+            <motion.div key={job.id} variants={cardVariants}>
+              <JobProfileCard job={job} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </div>
-  );
+  )
 }
