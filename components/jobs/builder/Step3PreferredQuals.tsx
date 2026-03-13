@@ -3,6 +3,23 @@
 import { useState } from 'react'
 import { X, Plus, Star, GripVertical } from 'lucide-react'
 import type { JobProfileFormData, PreferredSkill, PreferredCriteria } from '@/types'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const INDUSTRY_OPTIONS = ['Construction', 'Real Estate', 'Infrastructure', 'Oil & Gas', 'Government', 'Consulting']
 const EMPLOYER_TYPES = ['Main Contractor', 'Subcontractor', 'Consultant', 'Developer', 'Government']
@@ -24,10 +41,48 @@ interface Props {
   onChange: (updates: Partial<JobProfileFormData>) => void
 }
 
+function SortableSkillRow({ skill, onWeightChange, onRemove }: {
+  skill: PreferredSkill
+  onWeightChange: (id: string, weight: number) => void
+  onRemove: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: skill.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    background: '#0A0A0F',
+    border: '1px solid #1E1E2E',
+  }
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing" style={{ color: '#64748B', flexShrink: 0 }}>
+        <GripVertical size={14} />
+      </div>
+      <span className="flex-1 text-sm" style={{ color: '#F1F5F9', fontFamily: 'DM Sans, sans-serif' }}>{skill.name}</span>
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button key={star} onClick={() => onWeightChange(skill.id, star)} className="transition-colors">
+            <Star size={16} fill={star <= skill.weight ? '#F59E0B' : 'none'} style={{ color: star <= skill.weight ? '#F59E0B' : '#1E1E2E' }} />
+          </button>
+        ))}
+      </div>
+      <button onClick={() => onRemove(skill.id)} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: '#64748B' }}>
+        <X size={12} />
+      </button>
+    </div>
+  )
+}
+
 export function Step3PreferredQuals({ data, onChange }: Props) {
   const [skillInput, setSkillInput] = useState('')
   const [projectInput, setProjectInput] = useState('')
   const p = data.preferred
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const updatePreferred = (updates: Partial<PreferredCriteria>) => {
     onChange({ preferred: { ...p, ...updates } })
@@ -50,6 +105,15 @@ export function Step3PreferredQuals({ data, onChange }: Props) {
 
   const updateSkillWeight = (id: string, weight: number) => {
     updatePreferred({ skills: p.skills.map((s) => s.id === id ? { ...s, weight } : s) })
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      const oldIndex = p.skills.findIndex(s => s.id === active.id)
+      const newIndex = p.skills.findIndex(s => s.id === over.id)
+      updatePreferred({ skills: arrayMove(p.skills, oldIndex, newIndex) })
+    }
   }
 
   const toggleChip = (
@@ -99,40 +163,25 @@ export function Step3PreferredQuals({ data, onChange }: Props) {
               <Plus size={14} />
             </button>
           </div>
-          <div className="space-y-2">
-            {p.skills.map((skill, idx) => (
-              <div key={skill.id}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
-                style={{ background: '#0A0A0F', border: '1px solid #1E1E2E' }}>
-                <GripVertical size={14} style={{ color: '#64748B', flexShrink: 0, cursor: 'grab' }} />
-                <span className="flex-1 text-sm" style={{ color: '#F1F5F9', fontFamily: 'DM Sans, sans-serif' }}>
-                  {skill.name}
-                </span>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button key={star} onClick={() => updateSkillWeight(skill.id, star)}
-                      className="transition-colors">
-                      <Star
-                        size={16}
-                        fill={star <= skill.weight ? '#F59E0B' : 'none'}
-                        style={{ color: star <= skill.weight ? '#F59E0B' : '#1E1E2E' }}
-                      />
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => removeSkill(skill.id)}
-                  className="p-1 rounded transition-colors hover:bg-white/10"
-                  style={{ color: '#64748B' }}>
-                  <X size={12} />
-                </button>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={p.skills.map(s => s.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {p.skills.map((skill) => (
+                  <SortableSkillRow
+                    key={skill.id}
+                    skill={skill}
+                    onWeightChange={updateSkillWeight}
+                    onRemove={removeSkill}
+                  />
+                ))}
               </div>
-            ))}
-            {p.skills.length === 0 && (
-              <p className="text-xs py-3 text-center" style={{ color: '#64748B', fontFamily: 'DM Sans, sans-serif' }}>
-                Add skills to score candidates on. Rate each by importance (1–5 stars).
-              </p>
-            )}
-          </div>
+            </SortableContext>
+          </DndContext>
+          {p.skills.length === 0 && (
+            <p className="text-xs py-3 text-center" style={{ color: '#64748B', fontFamily: 'DM Sans, sans-serif' }}>
+              Add skills to score candidates on. Rate each by importance (1–5 stars).
+            </p>
+          )}
         </div>
 
         {/* Industry Background */}

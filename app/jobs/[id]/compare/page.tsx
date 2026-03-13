@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle, XCircle, Star, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
-import { allMockCandidates } from '@/lib/mock-data'
+import { apiClient } from '@/lib/api-client'
 import { useCompareStore } from '@/store'
 import type { Candidate } from '@/types'
 import { ScoreGauge } from '@/components/charts/ScoreGauge'
@@ -15,14 +15,35 @@ export default function ComparePage() {
   const params = useParams<{ id: string }>()
   const { selection } = useCompareStore()
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!selection) return
-    const found = selection.candidateIds
-      .map((id) => allMockCandidates.find((c) => c.id === id))
-      .filter(Boolean) as Candidate[]
-    setCandidates(found)
+    const fetchCandidates = async () => {
+      setLoading(true)
+      try {
+        const results = await Promise.all(
+          selection.candidateIds.map(id => apiClient.candidates.get(id))
+        )
+        setCandidates(results.filter(Boolean) as Candidate[])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchCandidates()
   }, [selection])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen" style={{ background: '#0A0A0F' }}>
+        <div className="px-4 sm:px-6 py-6">
+          <div className="h-5 w-32 rounded mb-6 animate-pulse" style={{ background: '#1E1E2E' }} />
+          <div className="h-8 w-56 rounded mb-6 animate-pulse" style={{ background: '#1E1E2E' }} />
+          <div className="rounded-xl animate-pulse" style={{ background: '#111118', border: '1px solid #1E1E2E', minHeight: 400 }} />
+        </div>
+      </div>
+    )
+  }
 
   if (candidates.length < 2) {
     return (

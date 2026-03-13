@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   BarChart2,
@@ -15,9 +16,11 @@ import {
   Archive,
 } from 'lucide-react'
 import { BarChart, Bar, ResponsiveContainer, Tooltip } from 'recharts'
+import { toast } from 'sonner'
 import type { JobProfile } from '@/types'
 import { JobStatusBadge } from '@/components/ui/StatusBadge'
 import { formatDate } from '@/lib/utils'
+import { apiClient } from '@/lib/api-client'
 
 interface JobProfileCardProps {
   job: JobProfile
@@ -25,6 +28,23 @@ interface JobProfileCardProps {
 
 export function JobProfileCard({ job }: JobProfileCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const router = useRouter()
+
+  const handleClone = () => {
+    toast.success('Opening new job with copied settings...')
+    router.push(`/jobs/new?clone=${job.id}`)
+    setMenuOpen(false)
+  }
+
+  const handleArchive = async () => {
+    setMenuOpen(false)
+    try {
+      await apiClient.jobs.update(job.id, { status: 'closed' })
+      toast.success('Job profile archived')
+    } catch {
+      toast.error('Failed to archive job')
+    }
+  }
 
   const pipelineItems = [
     { label: 'Uploaded', value: job.stats.uploaded, color: '#94A3B8' },
@@ -79,19 +99,28 @@ export function JobProfileCard({ job }: JobProfileCardProps) {
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                   <div className="absolute right-0 top-full mt-1 w-40 rounded-lg overflow-hidden shadow-xl z-20"
                     style={{ background: '#16161F', border: '1px solid #1E1E2E' }}>
-                    {[
-                      { icon: Edit3, label: 'Edit Profile', href: `/jobs/${job.id}/edit` },
-                      { icon: Copy, label: 'Clone', href: '#' },
-                      { icon: Archive, label: 'Archive', href: '#' },
-                    ].map(({ icon: Icon, label, href }) => (
-                      <Link key={label} href={href}
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5"
-                        style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif' }}>
-                        <Icon size={13} />
-                        {label}
-                      </Link>
-                    ))}
+                    <Link
+                      href={`/jobs/${job.id}/edit`}
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                      style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif' }}>
+                      <Edit3 size={13} />
+                      Edit Profile
+                    </Link>
+                    <button
+                      onClick={handleClone}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                      style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif' }}>
+                      <Copy size={13} />
+                      Clone
+                    </button>
+                    <button
+                      onClick={handleArchive}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                      style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif' }}>
+                      <Archive size={13} />
+                      Archive
+                    </button>
                   </div>
                 </>
               )}

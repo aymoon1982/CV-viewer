@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
@@ -28,6 +29,15 @@ import { ChatPanel } from '@/components/chat/ChatPanel'
 import { CandidateCardSkeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { getScoreColor, formatDate } from '@/lib/utils'
+
+const PDFViewer = dynamic(() => import('@/components/ui/PDFViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-64 flex items-center justify-center" style={{color:'#64748B'}}>
+      Loading PDF viewer...
+    </div>
+  ),
+})
 
 export default function CandidateProfilePage() {
   const params = useParams<{ id: string; candidateId: string }>()
@@ -365,21 +375,21 @@ export default function CandidateProfilePage() {
             </AnimatePresence>
           </div>
 
-          {/* CV Preview placeholder */}
+          {/* CV Preview */}
           <div className="rounded-xl p-5" style={{ background: '#111118', border: '1px solid #1E1E2E' }}>
             <h3 className="text-sm font-semibold mb-3" style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               CV Preview
             </h3>
-            <div className="h-32 rounded-lg flex flex-col items-center justify-center gap-2"
-              style={{ background: '#0A0A0F', border: '1px dashed #1E1E2E' }}>
-              <p className="text-xs" style={{ color: '#64748B', fontFamily: 'DM Sans, sans-serif' }}>
-                PDF viewer loads in production when CV file is available
-              </p>
-              <a href="#" className="text-xs font-medium"
-                style={{ color: '#6366F1', fontFamily: 'DM Sans, sans-serif' }}>
-                Download original CV
-              </a>
-            </div>
+            {c.cvFilePath ? (
+              <PDFViewer url={`/api/files/${c.cvFilePath}`} fileName={`${c.name}-CV.pdf`} />
+            ) : (
+              <div className="h-32 rounded-lg flex flex-col items-center justify-center gap-2"
+                style={{ background: '#0A0A0F', border: '1px dashed #1E1E2E' }}>
+                <p className="text-xs" style={{ color: '#64748B', fontFamily: 'DM Sans, sans-serif' }}>
+                  No CV file available for preview
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
