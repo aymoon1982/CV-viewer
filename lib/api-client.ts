@@ -77,6 +77,9 @@ const mockApi = {
       if (!existing) throw new Error('Job not found')
       return { ...existing, ...data, updatedAt: new Date().toISOString() }
     },
+    upload: async (_jobId: string, _files: File[]): Promise<void> => {
+      await delay(1000)
+    },
   },
 
   candidates: {

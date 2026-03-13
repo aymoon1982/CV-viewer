@@ -63,21 +63,27 @@ export default function WhatsAppPage() {
 
   const sendMessage = async () => {
     if (!messageInput.trim() || !activeThread) return
+    const content = messageInput
     const newMsg: WhatsAppMessage = {
       id: `msg-${Date.now()}`,
       threadId: activeThread.id,
       direction: 'outbound',
-      content: messageInput,
+      content,
       messageType: 'free_text',
       sentAt: new Date().toISOString(),
     }
     // Optimistic update
-    const updatedThread = { ...activeThread, messages: [...activeThread.messages, newMsg], lastMessage: messageInput, lastMessageAt: newMsg.sentAt }
+    const updatedThread = { ...activeThread, messages: [...activeThread.messages, newMsg], lastMessage: content, lastMessageAt: newMsg.sentAt }
     setActiveThread(updatedThread)
     setThreads((prev) => prev.map((t) => t.id === activeThread.id ? updatedThread : t))
     setMessageInput('')
     setDraftSuggestion(null)
-    toast.success('Message sent')
+    try {
+      await apiClient.whatsapp.sendMessage(activeThread.id, content)
+      toast.success('Message sent')
+    } catch {
+      toast.error('Failed to send message')
+    }
   }
 
   const generateDraft = async () => {
