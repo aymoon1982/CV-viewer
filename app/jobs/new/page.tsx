@@ -70,6 +70,17 @@ export default function NewJobPage() {
   }
 
   const goNext = () => {
+    if (currentStep === 1 && !formData.title.trim()) {
+      toast.error('Please enter a job title')
+      return
+    }
+    if (currentStep === 4) {
+      const total = Object.values(formData.weights).reduce((s, v) => s + v, 0)
+      if (total !== 100) {
+        toast.error(`Scoring weights must sum to 100 (currently ${total})`)
+        return
+      }
+    }
     if (currentStep < 5) {
       setDirection(1)
       setCurrentStep((s) => s + 1)

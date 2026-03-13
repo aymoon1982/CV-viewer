@@ -242,3 +242,33 @@ export interface UploadedFile {
   progress: number
   error?: string
 }
+
+// ─── Settings Types ──────────────────────────────────────────────────────────
+
+export type AiModel =
+  | 'claude-sonnet-4-6'
+  | 'claude-opus-4-6'
+  | 'claude-haiku-4-5-20251001'
+
+export interface AppSettings {
+  // User Profile
+  userName: string
+  userEmail: string
+  userRole: string
+  // AI Configuration
+  anthropicApiKey: string
+  aiModel: AiModel
+  aiEnabled: boolean
+  // WhatsApp Configuration
+  whatsappAccessToken: string
+  whatsappPhoneNumberId: string
+  whatsappVerifyToken: string
+  whatsappWebhookUrl: string
+  // Integration
+  backendApiUrl: string
+  useMockData: boolean
+  // Notification Preferences
+  notifyUploadComplete: boolean
+  notifyScoringComplete: boolean
+  notifyWhatsAppReply: boolean
+}

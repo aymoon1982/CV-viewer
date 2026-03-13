@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { Notification, CompareSelection, FilterState } from '@/types'
+import { persist } from 'zustand/middleware'
+import type { Notification, CompareSelection, FilterState, AppSettings, AiModel } from '@/types'
 import { mockNotifications } from '@/lib/mock-data'
 
 // ─── Notification Store ──────────────────────────────────────────────────────
@@ -79,3 +80,41 @@ export const useFilterStore = create<FilterStore>((set) => ({
     set((s) => ({ filters: { ...s.filters, [key]: value } })),
   resetFilters: () => set({ filters: defaultFilters }),
 }))
+
+// ─── Settings Store ───────────────────────────────────────────────────────────
+
+const defaultSettings: AppSettings = {
+  userName: 'HR Manager',
+  userEmail: 'hr@talentlens.io',
+  userRole: 'HR Manager',
+  anthropicApiKey: '',
+  aiModel: 'claude-sonnet-4-6' as AiModel,
+  aiEnabled: true,
+  whatsappAccessToken: '',
+  whatsappPhoneNumberId: '',
+  whatsappVerifyToken: '',
+  whatsappWebhookUrl: '',
+  backendApiUrl: '',
+  useMockData: true,
+  notifyUploadComplete: true,
+  notifyScoringComplete: true,
+  notifyWhatsAppReply: true,
+}
+
+interface SettingsStore {
+  settings: AppSettings
+  updateSettings: (updates: Partial<AppSettings>) => void
+  resetSettings: () => void
+}
+
+export const useSettingsStore = create<SettingsStore>()(
+  persist(
+    (set) => ({
+      settings: defaultSettings,
+      updateSettings: (updates) =>
+        set((s) => ({ settings: { ...s.settings, ...updates } })),
+      resetSettings: () => set({ settings: defaultSettings }),
+    }),
+    { name: 'talentlens-settings' }
+  )
+)

@@ -16,7 +16,7 @@ import {
 } from './mock-data'
 import { delay } from './utils'
 
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false'
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 // ─── Mock API ────────────────────────────────────────────────────────────────
 
@@ -76,6 +76,9 @@ const mockApi = {
       const existing = mockJobProfiles.find((j) => j.id === id)
       if (!existing) throw new Error('Job not found')
       return { ...existing, ...data, updatedAt: new Date().toISOString() }
+    },
+    upload: async (_jobId: string, _files: File[]): Promise<void> => {
+      await delay(1000)
     },
   },
 
@@ -147,10 +150,9 @@ const mockApi = {
 
 // ─── Real API ────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
-
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')
+  const res = await fetch(`${baseUrl}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
@@ -169,13 +171,18 @@ const realApi = {
       fetchApi<JobProfile>('/api/jobs', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<JobProfile>) =>
       fetchApi<JobProfile>(`/api/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    upload: async (jobId: string, files: File[]): Promise<void> => {
+      const form = new FormData()
+      files.forEach((f) => form.append('files', f))
+      await fetch(`/api/jobs/${jobId}/upload`, { method: 'POST', body: form })
+    },
   },
   candidates: {
     listByJob: (jobId: string, filters?: Partial<FilterState>) =>
       fetchApi<Candidate[]>(`/api/jobs/${jobId}/candidates?${new URLSearchParams(filters as Record<string, string>)}`),
     get: (candidateId: string) => fetchApi<Candidate>(`/api/candidates/${candidateId}`),
     updateStatus: (candidateId: string, status: Candidate['status']) =>
-      fetchApi<Candidate>(`/api/candidates/${candidateId}/status`, {
+      fetchApi<Candidate>(`/api/candidates/${candidateId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       }),
@@ -197,11 +204,13 @@ const realApi = {
         method: 'POST',
         body: JSON.stringify({ threadId, content }),
       }),
-    generateDraft: (threadId: string) =>
-      fetchApi<string>('/api/whatsapp/draft', {
+    generateDraft: async (threadId: string): Promise<string> => {
+      const data = await fetchApi<{ draft: string }>('/api/whatsapp/draft', {
         method: 'POST',
         body: JSON.stringify({ threadId }),
-      }),
+      })
+      return data.draft
+    },
   },
 }
 

@@ -7,6 +7,40 @@ import { jobTitleTemplates } from '@/lib/mock-data'
 
 const DEPARTMENTS: Department[] = ['Engineering', 'Commercial', 'Operations', 'HR', 'Finance']
 
+const JOB_TEMPLATE_DEFAULTS: Record<string, Partial<JobProfileFormData>> = {
+  'Senior Site Engineer': {
+    department: 'Engineering',
+    mandatory: {
+      degreeRequired: true, minDegreeLevel: 'bachelor', degreeFields: ['Civil Engineering', 'Structural Engineering'],
+      yearsMin: 8, yearsMax: 20, certifications: ['PMP', 'LEED'], uaeDrivingLicense: true, rightToWorkUAE: true, allowedNationalities: []
+    },
+    preferred: {
+      skills: [
+        { id: 'sk-1', name: 'AutoCAD', weight: 4 },
+        { id: 'sk-2', name: 'Primavera P6', weight: 5 },
+        { id: 'sk-3', name: 'FIDIC Contracts', weight: 3 },
+      ],
+      industryBackground: ['Construction', 'Infrastructure'],
+      employerType: ['Main Contractor'],
+      languages: ['English', 'Arabic'],
+      relevantProjects: ['High-rise residential', 'Infrastructure'],
+    },
+    weights: { yearsExperience: 30, technicalSkills: 30, industryBackground: 20, certifications: 15, languages: 5 },
+  },
+  'Project Manager': {
+    department: 'Operations',
+    mandatory: { degreeRequired: true, minDegreeLevel: 'bachelor', degreeFields: ['Engineering', 'Management'], yearsMin: 10, yearsMax: 25, certifications: ['PMP'], uaeDrivingLicense: true, rightToWorkUAE: true, allowedNationalities: [] },
+    preferred: { skills: [{ id: 'sk-1', name: 'MS Project', weight: 4 }, { id: 'sk-2', name: 'Primavera', weight: 5 }], industryBackground: ['Construction', 'Real Estate'], employerType: ['Main Contractor', 'Developer'], languages: ['English', 'Arabic'], relevantProjects: [] },
+    weights: { yearsExperience: 35, technicalSkills: 25, industryBackground: 20, certifications: 15, languages: 5 },
+  },
+  'Quantity Surveyor': {
+    department: 'Commercial',
+    mandatory: { degreeRequired: true, minDegreeLevel: 'bachelor', degreeFields: ['Quantity Surveying', 'Civil Engineering'], yearsMin: 5, yearsMax: 20, certifications: ['MRICS'], uaeDrivingLicense: false, rightToWorkUAE: true, allowedNationalities: [] },
+    preferred: { skills: [{ id: 'sk-1', name: 'CostX', weight: 5 }, { id: 'sk-2', name: 'Bluebeam', weight: 4 }, { id: 'sk-3', name: 'FIDIC', weight: 3 }], industryBackground: ['Construction', 'Consulting'], employerType: ['Consultant', 'Main Contractor'], languages: ['English'], relevantProjects: [] },
+    weights: { yearsExperience: 25, technicalSkills: 35, industryBackground: 20, certifications: 15, languages: 5 },
+  },
+}
+
 interface Props {
   data: JobProfileFormData
   onChange: (updates: Partial<JobProfileFormData>) => void
@@ -56,7 +90,12 @@ export function Step1RoleBasics({ data, onChange }: Props) {
   }
 
   const selectSuggestion = (title: string) => {
-    onChange({ title })
+    const template = JOB_TEMPLATE_DEFAULTS[title]
+    if (template) {
+      onChange({ title, ...template })
+    } else {
+      onChange({ title })
+    }
     setShowSuggestions(false)
     setTemplateTitle(title)
     setShowTemplate(true)
@@ -110,8 +149,12 @@ export function Step1RoleBasics({ data, onChange }: Props) {
               </span>
               <button className="text-xs font-medium px-2 py-1 rounded"
                 style={{ background: '#F59E0B', color: '#0A0A0F' }}
-                onClick={() => setShowTemplate(false)}>
-                Accept
+                onClick={() => {
+                  const template = JOB_TEMPLATE_DEFAULTS[templateTitle]
+                  if (template) onChange({ ...template })
+                  setShowTemplate(false)
+                }}>
+                Load Template
               </button>
               <button className="text-xs" style={{ color: '#94A3B8' }}
                 onClick={() => setShowTemplate(false)}>

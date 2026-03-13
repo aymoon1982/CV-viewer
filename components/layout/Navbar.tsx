@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   Plus,
 } from 'lucide-react'
+import { useSettingsStore } from '@/store'
 import { useNotificationStore } from '@/store'
 import { formatRelativeTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -25,16 +26,19 @@ const navLinks = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageSquare },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function Navbar() {
   const pathname = usePathname()
   const { notifications, markRead, markAllRead } = useNotificationStore()
+  const { settings } = useSettingsStore()
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const unreadCount = notifications.filter((n) => !n.read).length
+  const userInitials = settings.userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <>
@@ -174,7 +178,7 @@ export function Navbar() {
               className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors hover:bg-white/5">
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
                 style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: 'white', fontFamily: 'DM Sans, sans-serif' }}>
-                HR
+                {userInitials}
               </div>
               <ChevronDown size={14} style={{ color: '#64748B' }} />
             </button>
@@ -190,19 +194,21 @@ export function Navbar() {
                   style={{ background: '#16161F', border: '1px solid #1E1E2E', zIndex: 100 }}>
                   <div className="px-4 py-3" style={{ borderBottom: '1px solid #1E1E2E' }}>
                     <p className="text-sm font-medium" style={{ color: '#F1F5F9', fontFamily: 'DM Sans, sans-serif' }}>
-                      HR Manager
+                      {settings.userName}
                     </p>
-                    <p className="text-xs" style={{ color: '#64748B' }}>hr@talentlens.io</p>
+                    <p className="text-xs" style={{ color: '#64748B' }}>{settings.userEmail}</p>
                   </div>
                   {[
-                    { icon: User, label: 'Profile' },
-                    { icon: Settings, label: 'Settings' },
-                  ].map(({ icon: Icon, label }) => (
-                    <button key={label} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-white/5"
-                      style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif' }}>
+                    { icon: User, label: 'Profile', href: '/settings' },
+                    { icon: Settings, label: 'Settings', href: '/settings' },
+                  ].map(({ icon: Icon, label, href }) => (
+                    <Link key={label} href={href}
+                      onClick={() => setUserOpen(false)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-white/5"
+                      style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif', display: 'flex' }}>
                       <Icon size={14} />
                       {label}
-                    </button>
+                    </Link>
                   ))}
                   <div style={{ borderTop: '1px solid #1E1E2E' }}>
                     <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-white/5"

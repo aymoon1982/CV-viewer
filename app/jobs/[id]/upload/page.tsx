@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,7 +15,8 @@ import {
   Loader2,
   Eye,
 } from 'lucide-react'
-import { cn, formatFileSize, delay } from '@/lib/utils'
+import { cn, formatFileSize } from '@/lib/utils'
+import { apiClient } from '@/lib/api-client'
 import type { UploadedFile, UploadStatus } from '@/types'
 
 export default function CVUploadPage() {
@@ -23,6 +24,19 @@ export default function CVUploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const uploadFile = async (fileObj: File, id: string) => {
+    setFiles((prev) => prev.map((f) => f.id === id ? { ...f, status: 'extracting', progress: 30 } : f))
+    try {
+      await apiClient.jobs.upload(params.id, [fileObj])
+      setFiles((prev) => prev.map((f) => f.id === id ? { ...f, status: 'scoring', progress: 70 } : f))
+      // Brief pause to show scoring state before marking done
+      await new Promise((r) => setTimeout(r, 800))
+      setFiles((prev) => prev.map((f) => f.id === id ? { ...f, status: 'done', progress: 100 } : f))
+    } catch {
+      setFiles((prev) => prev.map((f) => f.id === id ? { ...f, status: 'failed', progress: 100, error: 'Upload failed — please retry' } : f))
+    }
+  }
 
   const addFiles = (newFiles: File[]) => {
     const remaining = 50 - files.length
@@ -34,8 +48,10 @@ export default function CVUploadPage() {
       type: f.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf',
       status: 'queued' as UploadStatus,
       progress: 0,
+      _file: f,
     }))
     setFiles((prev) => [...prev, ...mapped])
+    mapped.forEach((m) => uploadFile((m as UploadedFile & { _file: File })._file, m.id))
     if (newFiles.length > 50) {
       alert('Maximum 50 files at once. Only the first 50 were added.')
     }
@@ -62,52 +78,7 @@ export default function CVUploadPage() {
     setFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
-  // Simulate upload process for each queued file
-  useEffect(() => {
-    const queued = files.filter((f) => f.status === 'queued')
-    if (queued.length === 0) return
-
-    queued.forEach((file) => {
-      // Start extracting
-      const timer1 = setTimeout(() => {
-        setFiles((prev) =>
-          prev.map((f) => f.id === file.id ? { ...f, status: 'extracting', progress: 30 } : f)
-        )
-      }, 500)
-
-      // Start scoring
-      const timer2 = setTimeout(() => {
-        setFiles((prev) =>
-          prev.map((f) => f.id === file.id ? { ...f, status: 'scoring', progress: 70 } : f)
-        )
-      }, 2000)
-
-      // Done (or fail 1 in 8)
-      const timer3 = setTimeout(() => {
-        const isFail = Math.random() < 0.125
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === file.id
-              ? {
-                  ...f,
-                  status: isFail ? 'failed' : 'done',
-                  progress: 100,
-                  error: isFail ? 'Extraction confidence low — review required' : undefined,
-                }
-              : f
-          )
-        )
-      }, 4000)
-
-      return () => {
-        clearTimeout(timer1)
-        clearTimeout(timer2)
-        clearTimeout(timer3)
-      }
-    })
-  }, [files.filter((f) => f.status === 'queued').length])
-
-  const done = files.filter((f) => f.status === 'done').length
+const done = files.filter((f) => f.status === 'done').length
   const failed = files.filter((f) => f.status === 'failed').length
   const processing = files.filter((f) => ['queued', 'extracting', 'scoring'].includes(f.status)).length
   const hasResults = done > 0
