@@ -40,6 +40,8 @@ async def evaluate_candidate(
     candidate_data: dict,
     job_criteria: dict,
     scoring_weights: dict,
+    temperature: float = 0.1,
+    max_tokens: int = 4000,
 ) -> dict:
     """
     Score a candidate against job profile criteria.
@@ -61,19 +63,21 @@ Candidate Data:
 {json.dumps(candidate_data, indent=2, default=str)}
 """
 
-    response = await client.chat_json(
-        system=EVALUATOR_PROMPT,
-        user_message="Score this candidate against the job criteria.",
-        context=context,
-    )
-
     try:
+        response = await client.chat_json(
+            system=EVALUATOR_PROMPT,
+            user_message="Score this candidate against the job criteria.",
+            context=context,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
         scores = json.loads(response)
-    except json.JSONDecodeError:
+    except Exception as e:
         scores = {
             "criterion_scores": {},
             "final_score": 0,
-            "elimination_reason": "Scoring failed — could not parse LLM response",
+            "elimination_reason": f"AI Scoring Error: {str(e)}",
+            "error": str(e)
         }
 
     return scores

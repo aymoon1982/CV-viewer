@@ -39,6 +39,7 @@ class JobProfileUpdate(CamelModel):
     mandatory_criteria: dict | None = None
     preferred_criteria: dict | None = None
     scoring_weights: dict | None = None
+    is_archived: bool | None = None
 
 
 class JobStatsResponse(CamelModel):
@@ -64,6 +65,7 @@ class JobProfileResponse(CamelModel):
     template_used: str | None
     created_at: datetime
     updated_at: datetime
+    is_archived: bool = False
     stats: JobStatsResponse = Field(default_factory=JobStatsResponse)
 
 
@@ -71,6 +73,10 @@ class JobProfileResponse(CamelModel):
 
 class CandidateStatusUpdate(CamelModel):
     status: str  # shortlisted | rejected | under_review
+
+class CandidateOutcomeUpdate(CamelModel):
+    hiring_outcome: str  # hired | rejected_post_interview | withdrawn
+    hiring_notes: str | None = None
 
 
 class CandidateResponse(CamelModel):
@@ -100,6 +106,9 @@ class CandidateResponse(CamelModel):
     extraction_confidence: float
     shortlisted_at: datetime | None
     rejected_at: datetime | None
+    hiring_outcome: str | None = None
+    hiring_notes: str | None = None
+    is_archived: bool = False
     created_at: datetime
 
 
@@ -125,12 +134,14 @@ class SettingsUpdate(CamelModel):
     general: dict | None = None
     ai: dict | None = None
     notifications: dict | None = None
+    pipeline: dict | None = None
 
 
 class SettingsResponse(CamelModel):
     general: dict = Field(default_factory=dict)
     ai: dict = Field(default_factory=dict)
     notifications: dict = Field(default_factory=dict)
+    pipeline: dict = Field(default_factory=dict)
 
 
 # ─── Scoring ─────────────────────────────────────────────────────────────────

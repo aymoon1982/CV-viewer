@@ -78,7 +78,7 @@ async def upload_cvs(
         db.add(candidate)
         created.append(file_id)
 
-    await db.flush()
+    await db.commit()
 
     # Trigger async scoring pipeline for each created candidate
     for cid in created:
@@ -91,15 +91,21 @@ async def upload_cvs(
     }
 
 
-@router.get("/jobs/{job_id}/candidates", response_model=list[CandidateResponse])
+@router.get("/jobs/{job_id}/candidates", response_model=List[CandidateResponse])
 async def list_candidates(
     job_id: str,
-    status: str | None = None,
+    status: Optional[str] = None,
     sort_by: str = "score_desc",
+    limit: int = 50,
+    offset: int = 0,
+    include_archived: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """List all candidates for a job profile, with optional filtering and sorting."""
+    """List candidates for a job profile with optional filtering, sorting and pagination."""
     query = select(Candidate).where(Candidate.job_profile_id == job_id)
+
+    if not include_archived:
+        query = query.where(Candidate.is_archived == False)
 
     if status:
         query = query.where(Candidate.status == status)
@@ -115,6 +121,7 @@ async def list_candidates(
     else:
         query = query.order_by(Candidate.final_score.desc())
 
+    query = query.offset(offset).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -141,7 +148,7 @@ async def update_candidate_status(
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
-    valid_statuses = {"shortlisted", "rejected", "under_review"}
+    valid_statuses = {"shortlisted", "rejected", "under_review", "uploaded", "scored", "eliminated"}
     if data.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Status must be one of: {valid_statuses}")
 
@@ -151,5 +158,5 @@ async def update_candidate_status(
     elif data.status == "rejected":
         candidate.rejected_at = datetime.utcnow()
 
-    await db.flush()
+    await db.commit()
     return {"message": f"Candidate status updated to {data.status}", "candidate_id": candidate_id}

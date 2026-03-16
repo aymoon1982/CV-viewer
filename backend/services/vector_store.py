@@ -74,3 +74,35 @@ def search_candidate_cv(candidate_id: str, query: str, top_k: int = 3) -> list[s
     except Exception as e:
         logger.error(f"Error querying chroma for candidate {candidate_id}: {e}")
         return []
+
+def search_job_cvs(job_id: str, query: str, top_k: int = 5, candidate_ids: list[str] = None) -> list[dict]:
+    """
+    Search across multiple candidates CVs within a job profile.
+    If candidate_ids is provided, limits search to those specific candidates (e.g. only shortlisted).
+    Returns list of dicts with 'content' and 'candidate_id'.
+    """
+    try:
+        where_clause = {"job_id": job_id}
+        if candidate_ids:
+            if len(candidate_ids) == 1:
+                where_clause["candidate_id"] = candidate_ids[0]
+            else:
+                where_clause["candidate_id"] = {"$in": candidate_ids}
+
+        results = collection.query(
+            query_texts=[query],
+            n_results=top_k,
+            where=where_clause
+        )
+        
+        output = []
+        if results['documents'] and results['documents'][0]:
+            for i in range(len(results['documents'][0])):
+                output.append({
+                    "content": results['documents'][0][i],
+                    "candidate_id": results['metadatas'][0][i]['candidate_id']
+                })
+        return output
+    except Exception as e:
+        logger.error(f"Error querying chroma for job {job_id}: {e}")
+        return []

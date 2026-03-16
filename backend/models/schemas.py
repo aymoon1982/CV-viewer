@@ -53,6 +53,7 @@ class JobProfile(Base):
     scoring_weights = Column(JSON, default=dict)
     template_used = Column(String(100), nullable=True)
 
+    is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -110,6 +111,12 @@ class Candidate(Base):
     # Timestamps
     shortlisted_at = Column(DateTime, nullable=True)
     rejected_at = Column(DateTime, nullable=True)
+    
+    # Hiring Outcomes
+    hiring_outcome = Column(String(50), nullable=True) # hired | rejected_post_interview | withdrawn
+    hiring_notes = Column(Text, nullable=True)
+    is_archived = Column(Boolean, default=False)
+    
     created_at = Column(DateTime, default=utcnow)
 
     # Relationships
@@ -158,6 +165,7 @@ class WhatsAppThread(Base):
     job_profile_id = Column(String, ForeignKey("job_profiles.id"))
     phone_number = Column(String(50))
     status = Column(String(20), default="screening")
+    unread_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow)
 
 class WhatsAppMessage(Base):

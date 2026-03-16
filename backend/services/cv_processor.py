@@ -25,13 +25,21 @@ def extract_text(file_path: str) -> str:
 
 
 def _extract_pdf(path: str) -> str:
-    """Extract text from a PDF file using PyMuPDF."""
-    doc = fitz.open(path)
-    text_parts = []
-    for page in doc:
-        text_parts.append(page.get_text("text"))
-    doc.close()
-    return "\n".join(text_parts).strip()
+    """Extract text from a PDF file using PyMuPDF. Fallback to raw text if it fails."""
+    try:
+        doc = fitz.open(path)
+        text_parts = []
+        for page in doc:
+            text_parts.append(page.get_text("text"))
+        doc.close()
+        return "\n".join(text_parts).strip()
+    except Exception as e:
+        # Fallback for non-standard or text files named as .pdf
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read().strip()
+        except Exception:
+            raise ValueError(f"Could not extract text from PDF: {str(e)}")
 
 
 def _extract_docx(path: str) -> str:

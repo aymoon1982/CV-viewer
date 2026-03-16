@@ -35,7 +35,7 @@ def _compute_score_distribution(candidates: list[Candidate]) -> list[dict]:
 
 
 def _build_stats(candidates: list[Candidate]) -> JobStatsResponse:
-    scored = [c for c in candidates if c.status in ("scored", "shortlisted", "under_review", "rejected")]
+    scored = [c for c in candidates if c.status in ("scored", "shortlisted", "under_review", "rejected", "eliminated")]
     scores = [c.final_score for c in scored] if scored else []
     return JobStatsResponse(
         uploaded=len(candidates),
@@ -47,10 +47,20 @@ def _build_stats(candidates: list[Candidate]) -> JobStatsResponse:
     )
 
 
-@router.get("", response_model=list[JobProfileResponse])
-async def list_jobs(db: AsyncSession = Depends(get_db)):
-    """List all job profiles with computed stats."""
-    result = await db.execute(select(JobProfile).order_by(JobProfile.created_at.desc()))
+@router.get("", response_model=List[JobProfileResponse])
+async def list_jobs(
+    limit: int = 20,
+    offset: int = 0,
+    include_archived: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all job profiles with stats and pagination."""
+    query = select(JobProfile)
+    if not include_archived:
+        query = query.where(JobProfile.is_archived == False)
+
+    query = query.order_by(JobProfile.created_at.desc()).offset(offset).limit(limit)
+    result = await db.execute(query)
     jobs = result.scalars().all()
 
     responses = []

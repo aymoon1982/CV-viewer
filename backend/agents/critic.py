@@ -4,8 +4,11 @@ Validates and refines scores from the evaluator.
 """
 
 import json
+import logging
 
 from agents.llm_client import get_llm_client
+
+logger = logging.getLogger(__name__)
 
 
 CRITIC_PROMPT = """You are a quality assurance reviewer for an AI recruitment scoring system.
@@ -35,11 +38,18 @@ async def review_scores(
     candidate_data: dict,
     scores: dict,
     job_criteria: dict,
+    enabled: bool = True,
+    temperature: float = 0.1,
 ) -> dict:
     """
     Review and validate scores from the evaluator.
     Returns adjusted scores if discrepancies are found.
+    If enabled=False, passes scores through unchanged.
     """
+    if not enabled:
+        scores["review_flags"] = ["Critic review skipped (disabled in pipeline settings)"]
+        return scores
+
     client = get_llm_client()
 
     context = f"""
@@ -53,16 +63,17 @@ Job Criteria:
 {json.dumps(job_criteria, indent=2)}
 """
 
-    response = await client.chat_json(
-        system=CRITIC_PROMPT,
-        user_message="Review these candidate scores for accuracy and consistency.",
-        context=context,
-    )
-
     try:
+        response = await client.chat_json(
+            system=CRITIC_PROMPT,
+            user_message="Review these candidate scores for accuracy and consistency.",
+            context=context,
+            temperature=temperature,
+        )
         review = json.loads(response)
-    except json.JSONDecodeError:
-        review = {"approved": True, "adjustments": {}, "flags": []}
+    except Exception as e:
+        logger.warning(f"[Critic] Review failed ({e}), passing scores unchanged")
+        review = {"approved": True, "adjustments": {}, "flags": [f"Critic unavailable: {str(e)}"]}
 
     # Apply adjustments if needed
     if not review.get("approved", True) and review.get("adjustments"):

@@ -20,6 +20,8 @@ Do NOT use generic phrases like "strong candidate" without evidence.
 async def generate_summary(
     candidate_data: dict,
     scores: dict,
+    temperature: float = 0.3,
+    max_tokens: int = 300,
 ) -> str:
     """
     Generate a 3-sentence executive summary for a candidate.
@@ -39,7 +41,8 @@ Criterion Scores: {scores.get('criterion_scores', {})}
         system=SUMMARIZER_PROMPT,
         user_message="Write a 3-sentence summary for this candidate.",
         context=context,
-        max_tokens=300,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
 
     return summary.strip()

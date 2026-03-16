@@ -55,6 +55,38 @@ class WhatsAppService:
                 await self._record_message(db, thread_id, to_number, text, candidate_id, "outbound")
                 return False
 
+    async def send_template(self, db: AsyncSession, to_number: str, template_name: str, candidate_id: str, thread_id: str = None) -> bool:
+        """Send a WhatsApp template message (outreach)."""
+        if not self.token or not self.phone_number_id:
+            logger.warning("WhatsApp API credentials missing. Simulating template send.")
+            await self._record_message(db, thread_id, to_number, f"Template: {template_name}", candidate_id, "outbound")
+            return True
+
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_number,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": "en_US"}
+            }
+        }
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/messages", headers=headers, json=payload)
+                response.raise_for_status()
+                await self._record_message(db, thread_id, to_number, f"Template: {template_name}", candidate_id, "outbound")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to send template: {e}")
+                await self._record_message(db, thread_id, to_number, f"Template: {template_name}", candidate_id, "outbound")
+                return False
+
     async def _record_message(self, db: AsyncSession, thread_id: str, phone: str, text: str, candidate_id: str, direction: str):
         """Record the message in the DB."""
         if not thread_id:

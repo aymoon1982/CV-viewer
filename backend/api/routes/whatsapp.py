@@ -47,7 +47,7 @@ async def get_threads(db: AsyncSession = Depends(get_db)):
             "status": thread.status,
             "last_message": last_msg.content if last_msg else None,
             "last_message_time": last_msg.sent_at if last_msg else thread.created_at,
-            "unread_count": 0 # Not implemented yet
+            "unread_count": thread.unread_count
         })
     return threads
 
@@ -73,6 +73,16 @@ async def get_messages(candidate_id: str, db: AsyncSession = Depends(get_db)):
         "createdAt": m.sent_at.isoformat()
     } for m in messages]
 
+@router.post("/threads/{candidate_id}/read")
+async def mark_thread_read(candidate_id: str, db: AsyncSession = Depends(get_db)):
+    """Reset the unread count for a thread."""
+    result = await db.execute(select(WhatsAppThread).where(WhatsAppThread.candidate_id == candidate_id))
+    thread = result.scalar_one_or_none()
+    if thread:
+        thread.unread_count = 0
+        await db.commit()
+    return {"status": "ok"}
+
 @router.post("/send")
 async def send_whatsapp_message(req: SendMessageRequest, db: AsyncSession = Depends(get_db)):
     """Send an outbound WhatsApp message from the dashboard."""
@@ -85,8 +95,7 @@ async def send_whatsapp_message(req: SendMessageRequest, db: AsyncSession = Depe
         
     phone = candidate.phone
     if not phone:
-        # Fallback dummy phone if not parsed correctly
-        phone = "+971501234567"
+        raise HTTPException(status_code=400, detail="Candidate has no phone number on record")
         
     # Find active thread
     thread_result = await db.execute(select(WhatsAppThread).where(WhatsAppThread.candidate_id == req.candidate_id))
@@ -145,6 +154,11 @@ async def handle_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                         thread = result.scalar_one_or_none()
                         
                         if thread:
+                            # 1. Update Thread
+                            thread.unread_count += 1
+                            thread.status = "replied" # Update status to indicate candidate replied
+                            
+                            # 2. Add Message
                             new_msg = WhatsAppMessage(
                                 thread_id=thread.id,
                                 direction="inbound",

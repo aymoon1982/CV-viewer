@@ -23,24 +23,70 @@ class LLMClient:
     - vLLM, Together AI, Groq, etc.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
+        provider: str | None = None,
+        http_referer: str | None = None,
+        site_name: str | None = None,
+    ):
         settings = get_settings()
-        self.model = settings.AI_MODEL
+        self.provider = provider if provider is not None else settings.AI_PROVIDER
+        self.model = model if model is not None else settings.AI_MODEL
         self.embedding_model = settings.AI_EMBEDDING_MODEL
+
+        # API settings - Only fall back to settings if the parameter is None
+        self.api_key = api_key if api_key is not None else settings.AI_API_KEY
+        self.base_url = base_url if base_url is not None else settings.AI_API_BASE_URL
+        self.http_referer = http_referer if http_referer is not None else settings.AI_HTTP_REFERER
+        self.site_name = site_name if site_name is not None else settings.AI_SITE_NAME
 
         # Build extra headers for OpenRouter
         default_headers = {}
-        if settings.is_openrouter:
+        if self.provider == "openrouter":
             default_headers = {
-                "HTTP-Referer": settings.AI_HTTP_REFERER,
-                "X-Title": settings.AI_SITE_NAME,
+                "HTTP-Referer": self.http_referer,
+                "X-Title": self.site_name,
             }
 
         self.client = AsyncOpenAI(
-            api_key=settings.AI_API_KEY or "ollama",  # Ollama doesn't need a real key
-            base_url=settings.AI_API_BASE_URL,
+            api_key=self.api_key or "ollama",  # Ollama doesn't need a real key
+            base_url=self.base_url,
             default_headers=default_headers or None,
         )
+
+    async def test_connection(self) -> dict:
+        """
+        Verify the AI connection by making minimal completion and embedding calls.
+        Returns a dict with verification results.
+        """
+        results = {"chat": "passed", "embedding": "skipped", "model": self.model}
+        
+        # 1. Test Chat
+        try:
+            await self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=5,
+                temperature=0,
+            )
+        except Exception as e:
+            results["chat"] = f"failed: {str(e)}"
+            
+        # 2. Test Embedding
+        if self.embedding_model:
+            try:
+                await self.client.embeddings.create(
+                    model=self.embedding_model,
+                    input=["ping"],
+                )
+                results["embedding"] = "passed"
+            except Exception as e:
+                results["embedding"] = f"failed: {str(e)}"
+        
+        return results
 
     async def chat(
         self,
@@ -70,6 +116,7 @@ class LLMClient:
         user_message: str,
         context: str = "",
         temperature: float = 0.1,
+        max_tokens: int = 4000,
     ) -> str:
         """Chat completion that requests JSON output."""
         messages = [{"role": "system", "content": system + "\n\nRespond ONLY with valid JSON."}]
@@ -81,7 +128,7 @@ class LLMClient:
             model=self.model,
             messages=messages,
             temperature=temperature,
-            max_tokens=4000,
+            max_tokens=max_tokens,
             response_format={"type": "json_object"},
         )
         return response.choices[0].message.content or "{}"

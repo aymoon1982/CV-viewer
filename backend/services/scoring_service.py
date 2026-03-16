@@ -1,18 +1,28 @@
+import json
 import logging
+import os
 from sqlalchemy import select
 from models.database import async_session
-from models.schemas import Candidate, JobProfile
+from models.schemas import Candidate, JobProfile, AppSetting
 
-logger = logging.getLogger(__name__)
+# Set up a dedicated logger for scoring that writes to a file
+scoring_log_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scoring_debug.log")
+file_handler = logging.FileHandler(scoring_log_path)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger = logging.getLogger("scoring_service")
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
 
 async def process_candidate_scoring(candidate_id: str):
     """
     Background worker function to score a candidate.
     Creates its own DB session to avoid detached instance errors.
     """
+    print(f"DEBUG: process_candidate_scoring started for {candidate_id}")
     from agents.pipeline import run_scoring_pipeline
     
     async with async_session() as db:
+        print(f"DEBUG: DB session created for {candidate_id}")
         try:
             # 1. Fetch Candidate
             result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
@@ -48,9 +58,22 @@ async def process_candidate_scoring(candidate_id: str):
             candidate.status = "scoring"
             await db.commit()
 
-            # 3. Run Pipeline
+            # 3. Load pipeline settings from DB
+            pipeline_row = await db.execute(
+                select(AppSetting).where(AppSetting.key == "pipeline")
+            )
+            pipeline_setting = pipeline_row.scalar_one_or_none()
+            pipeline_cfg = (
+                json.loads(pipeline_setting.value)
+                if pipeline_setting and pipeline_setting.value
+                else {}
+            )
+
+            # 4. Run Pipeline
+            print(f"DEBUG: Starting scoring pipeline for {candidate_id}")
             logger.info(f"Starting scoring pipeline for candidate {candidate_id}")
-            scores = await run_scoring_pipeline(candidate, job)
+            scores = await run_scoring_pipeline(candidate, job, pipeline_cfg=pipeline_cfg)
+            print(f"DEBUG: Pipeline finished for {candidate_id}")
 
             # 4. Save Results
             candidate.status = scores.get("status", "scored")
@@ -74,12 +97,20 @@ async def process_candidate_scoring(candidate_id: str):
             logger.info(f"Successfully scored candidate {candidate_id} (Score: {candidate.final_score})")
 
         except Exception as e:
-            await db.rollback()
-            logger.error(f"Exception during scoring candidate {candidate_id}: {str(e)}")
+            logger.exception(f"CRITICAL ERROR scoring candidate {candidate_id}")
             try:
-                candidate.status = "scored"
-                candidate.final_score = 0
-                candidate.ai_summary = f"Scoring error: {str(e)}"
-                await db.commit()
+                await db.rollback()
             except Exception:
                 pass
+            # Re-fetch after rollback — the original `candidate` object is detached
+            try:
+                result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
+                cand2 = result.scalar_one_or_none()
+                if cand2:
+                    cand2.status = "error"
+                    cand2.final_score = 0
+                    cand2.ai_summary = f"Scoring error: {str(e)}"
+                    await db.commit()
+                    logger.info(f"Marked candidate {candidate_id} as error")
+            except Exception as inner_e:
+                logger.error(f"Failed to update error status for {candidate_id}: {inner_e}")

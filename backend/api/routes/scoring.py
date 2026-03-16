@@ -3,7 +3,7 @@ TalentLens — Scoring API Routes
 Trigger and retrieve candidate scoring.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,3 +64,36 @@ async def get_score(candidate_id: str, db: AsyncSession = Depends(get_db)):
         ai_summary=candidate.ai_summary,
         status=candidate.status,
     )
+
+
+@router.post("/candidates/{candidate_id}/retry", status_code=202)
+async def retry_scoring(
+    candidate_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retry scoring for a candidate that is in 'error' or 'failed' state.
+    Runs in the background and returns immediately.
+    """
+    result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
+    candidate = result.scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    retryable = {"error", "failed"}
+    if candidate.status not in retryable:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Candidate status is '{candidate.status}'. Only {retryable} candidates can be retried.",
+        )
+
+    if not candidate.cv_file_path:
+        raise HTTPException(status_code=400, detail="No CV file found for this candidate")
+
+    # Reset to uploaded so the pipeline treats it as fresh
+    candidate.status = "uploaded"
+    await db.commit()
+
+    background_tasks.add_task(process_candidate_scoring, candidate_id)
+    return {"message": "Scoring retry queued", "candidate_id": candidate_id}

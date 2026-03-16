@@ -4,8 +4,13 @@ Uses LLM to extract structured candidate data from raw CV text.
 """
 
 import json
+import logging
 
 from agents.llm_client import get_llm_client
+
+logger = logging.getLogger(__name__)
+
+_CV_CHAR_LIMIT = 8000
 
 
 EXTRACTION_PROMPT = """You are an expert HR data extraction system. Extract structured candidate information from the CV text below.
@@ -45,29 +50,40 @@ Rules:
 """
 
 
-async def extract_candidate_data(cv_text: str) -> dict:
+async def extract_candidate_data(
+    cv_text: str,
+    char_limit: int = _CV_CHAR_LIMIT,
+    temperature: float = 0.1,
+) -> dict:
     """
     Extract structured candidate data from raw CV text using the LLM.
     Returns a dictionary matching the Candidate model fields.
     """
     client = get_llm_client()
 
-    response = await client.chat_json(
-        system=EXTRACTION_PROMPT,
-        user_message=f"Extract candidate data from this CV:\n\n{cv_text[:8000]}",
-    )
-
     try:
+        if len(cv_text) > char_limit:
+            logger.warning(
+                f"[Extractor] CV truncated from {len(cv_text)} to {char_limit} chars — "
+                "skills/certifications near the end may be missed"
+            )
+        response = await client.chat_json(
+            system=EXTRACTION_PROMPT,
+            user_message=f"Extract candidate data from this CV:\n\n{cv_text[:char_limit]}",
+            temperature=temperature,
+        )
         data = json.loads(response)
-    except json.JSONDecodeError:
+    except Exception as e:
+        # Catch both LLM errors (auth, quota) and JSON parsing errors
         data = {
-            "name": "Unknown",
+            "name": "Unknown (Extraction Error)",
             "extraction_confidence": 0.0,
             "skills": [],
             "education": [],
             "experience": [],
             "certifications": [],
             "languages": [],
+            "error": str(e) # Store error for the pipeline to report
         }
 
     return data
