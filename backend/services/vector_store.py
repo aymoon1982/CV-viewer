@@ -82,12 +82,23 @@ def search_job_cvs(job_id: str, query: str, top_k: int = 5, candidate_ids: list[
     Returns list of dicts with 'content' and 'candidate_id'.
     """
     try:
-        where_clause = {"job_id": job_id}
         if candidate_ids:
             if len(candidate_ids) == 1:
-                where_clause["candidate_id"] = candidate_ids[0]
+                where_clause = {
+                    "$and": [
+                        {"job_id": job_id},
+                        {"candidate_id": candidate_ids[0]}
+                    ]
+                }
             else:
-                where_clause["candidate_id"] = {"$in": candidate_ids}
+                where_clause = {
+                    "$and": [
+                        {"job_id": job_id},
+                        {"candidate_id": {"$in": candidate_ids}}
+                    ]
+                }
+        else:
+            where_clause = {"job_id": job_id}
 
         results = collection.query(
             query_texts=[query],

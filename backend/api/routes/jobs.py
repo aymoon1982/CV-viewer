@@ -4,6 +4,7 @@ CRUD operations for job profiles.
 """
 
 from datetime import datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
@@ -83,6 +84,7 @@ async def list_jobs(
             template_used=job.template_used,
             created_at=job.created_at,
             updated_at=job.updated_at,
+            is_archived=job.is_archived,
             stats=_build_stats(candidates),
         )
         responses.append(resp)
@@ -153,6 +155,7 @@ async def create_job(data: JobProfileCreate, db: AsyncSession = Depends(get_db))
         template_used=job.template_used,
         created_at=job.created_at,
         updated_at=job.updated_at,
+        is_archived=job.is_archived,
         stats=JobStatsResponse(),
     )
 
